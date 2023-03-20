@@ -36,6 +36,7 @@ contract CrowdFundingTest is Test {
     assertEq(id, 0);
   }
 
+  //Todo: Debug Previous contract balance
   function testDonateToCampaign() public {
     uint256 id = crowdFunding.createCampaign(
       address(bob),
@@ -54,5 +55,90 @@ contract CrowdFundingTest is Test {
     uint256 contractBalance = address(crowdFunding).balance;
     // after donating, the contract balance should be 100
     assertEq(contractBalance, 100);
+  }
+
+  function testWithdraw() public {
+    uint256 id = crowdFunding.createCampaign(
+      address(bob),
+      "Test",
+      "Test Description",
+      100,
+      block.timestamp + 10000,
+      "https://i.kym-cdn.com/photos/images/newsfeed/002/205/307/1f7.jpg"
+    );
+    // emit balance of bob
+    uint256 bobBalance = address(bob).balance;
+    emit log_named_uint("Bob's original balance", bobBalance);
+
+    // Alice will donate to the campaign
+    vm.prank(alice);
+    //emit alice's balance before donation
+    emit log_named_uint("Alice's balance before donation", address(alice).balance);
+    crowdFunding.donateToCampaign{ value: 100 }(id);
+    // emit balance of alice after donation
+    emit log_named_uint("Alice's Balance after donation", address(alice).balance);
+
+    // bob will withdraw the funds
+    vm.prank(bob);
+    // we are now using a cheat code to warp the time to 10001 seconds after the current time, so that the campaign deadline is passed
+    vm.warp(block.timestamp + 10001);
+    crowdFunding.withdraw(id);
+    uint256 bobBalanceAfterWithdrawal = address(bob).balance;
+    emit log_named_uint("Bob's Balance after Withdrawal", bobBalanceAfterWithdrawal);
+
+    // So when bob started he had 0 in his address, then he created a campaign and alice donated 100 to the campaign, so bob's balance should be 100 after withdrawal
+    assertEq(bobBalanceAfterWithdrawal, bobBalance + 100);
+    assertEq(address(crowdFunding).balance, 0);
+  }
+
+  function testGetCampaign() public {
+    uint256 id = crowdFunding.createCampaign(
+      address(bob),
+      "Test",
+      "Test Description",
+      1000,
+      block.timestamp + 10000,
+      "https://i.kym-cdn.com/photos/images/newsfeed/002/205/307/1f7.jpg"
+    );
+    vm.prank(alice);
+    crowdFunding.donateToCampaign{ value: 100 }(id);
+    (
+      address owner,
+      string memory title,
+      string memory description,
+      uint256 target,
+      uint256 deadline,
+      uint256 amountCollected,
+      string memory image
+    ) = crowdFunding.getCampaign(id);
+    assertEq(owner, address(bob));
+    assertEq(title, "Test");
+    assertEq(description, "Test Description");
+    assertEq(target, 1000);
+    assertEq(deadline, block.timestamp + 10000);
+    assertEq(image, "https://i.kym-cdn.com/photos/images/newsfeed/002/205/307/1f7.jpg");
+    assertEq(amountCollected, 100);
+  }
+
+  // Testing the withdraw() function when the deadline has not passed yet
+  // This function should revert
+  // We are using vm.expectRevert() to check if the function reverts
+  function testWithdrawFailBeforeDeadline() public {
+    uint256 id = crowdFunding.createCampaign(
+      address(bob),
+      "Test",
+      "Test Description",
+      100,
+      block.timestamp + 10000,
+      "https://i.kym-cdn.com/photos/images/newsfeed/002/205/307/1f7.jpg"
+    );
+    //Alice will donate to campaign
+    vm.prank(alice);
+    crowdFunding.donateToCampaign{ value: 100 }(id);
+
+    // bob will try to withdraw the funds before the deadline
+    vm.prank(bob);
+    vm.expectRevert("The deadline has not passed yet.");
+    crowdFunding.withdraw(id);
   }
 }

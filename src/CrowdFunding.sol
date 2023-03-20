@@ -50,7 +50,7 @@ contract CrowdFunding {
 
   function withdraw(uint256 _id) public {
     Campaign storage campaign = campaigns[_id];
-    require(campaign.owner == msg.sender, "Only the owner of the campaign can withdraw the funds.");
+    require(campaign.owner == msg.sender, "Only the owner of the campaign can withdraw funds.");
     require(campaign.amountCollected >= campaign.target, "The campaign has not reached its target yet.");
     require(campaign.deadline < block.timestamp, "The deadline has not passed yet.");
 
